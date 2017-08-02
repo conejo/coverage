@@ -89,10 +89,3 @@ func getPackages() []string {
 
 	return lines
 }
-
-/*
-~\go\src\salucro.bolt [development ≡]> go list ./...
-salucro.bolt/cmd/bolt-server
-salucro.bolt/pkg/api
-salucro.bolt/pkg/services
-*/
