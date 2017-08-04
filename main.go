@@ -1,14 +1,16 @@
 package main
 
-import "os"
-
-import "os/exec"
-import "log"
-import "bufio"
-import "bytes"
-import "strings"
-import "fmt"
-import "io"
+import (
+	"bufio"
+	"bytes"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"os/exec"
+	"strings"
+	"sync"
+)
 
 var (
 	workdir = ".cover"
@@ -36,9 +38,17 @@ func generateCoverData() {
 	}
 	pkgs := getPackages()
 
+	var wg sync.WaitGroup
+
 	for _, pkg := range pkgs {
-		runTestsInDir(pkg)
+		wg.Add(1)
+		go func(pkg string) {
+			defer wg.Done()
+			runTestsInDir(pkg)
+		}(pkg)
 	}
+
+	wg.Wait()
 
 	file, err := os.Create(profile)
 	if err != nil {
