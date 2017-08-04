@@ -32,7 +32,7 @@ func generateCoverData() {
 	if err != nil {
 		log.Fatal("error deleting workdir: ", err)
 	}
-	err = os.Mkdir(workdir, os.FileMode(int(0666)))
+	err = os.Mkdir(workdir, os.FileMode(int(0777)))
 	if err != nil {
 		log.Fatal("error creating workdir: ", err)
 	}
