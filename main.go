@@ -8,30 +8,82 @@ import "bufio"
 import "bytes"
 import "strings"
 import "fmt"
+import "io"
 
 var (
 	workdir = ".cover"
-	profile = workdir + "cover.out"
+	profile = workdir + "/cover.out"
 	mode    = "count"
 )
 
 func main() {
 	generateCoverData()
+
+	//todo: go tool cover --func=./.cover/cover.out
+	runCover()
+
+	//todo: handle html flag
 }
 
 func generateCoverData() {
-	_ = os.Remove(workdir)
-	_ = os.Mkdir(workdir, os.FileMode(int(0777)))
+	err := os.RemoveAll(workdir)
+	if err != nil {
+		log.Fatal("error deleting workdir: ", err)
+	}
+	err = os.Mkdir(workdir, os.FileMode(int(0666)))
+	if err != nil {
+		log.Fatal("error creating workdir: ", err)
+	}
 	pkgs := getPackages()
 
 	for _, pkg := range pkgs {
 		runTestsInDir(pkg)
 	}
-	//todo: create profile file
-	//todo: add 'mode=count' header text
+
+	file, err := os.Create(profile)
+	if err != nil {
+		log.Fatal("error creating profile file: ", err)
+	}
+	defer file.Close()
+
+	_, err = file.WriteString("mode: count\n")
+	if err != nil {
+		log.Fatal("error writing to profile file: ", err)
+	}
+
 	//todo: append *.cover files to profile file
-	//todo: go tool cover --func=./.cover/api.
-	//todo: handle html flag
+	wd, err := os.Open(workdir)
+	if err != nil {
+		log.Fatal("could not open workdir: ", err)
+	}
+	defer wd.Close()
+	files, err := wd.Readdirnames(0)
+	if err != nil {
+		log.Fatal("error getting file names: ", err)
+	}
+	for _, coverFile := range files {
+		if strings.HasSuffix(coverFile, ".cover") {
+			f, err := os.Open(fmt.Sprintf("%s/%s", workdir, coverFile))
+			defer f.Close()
+			if err != nil {
+				log.Fatal("couldn't open ", coverFile, ": ", err)
+			}
+
+			scanner := bufio.NewScanner(f)
+			for scanner.Scan() {
+				text := scanner.Text()
+				if text == "mode: count" {
+					continue
+				}
+
+				_, err = io.Copy(file, strings.NewReader(text+"\n"))
+				if err != nil {
+					log.Fatal("error writing to profile: ", err)
+				}
+			}
+		}
+	}
+
 }
 
 func runTestsInDir(dir string) {
@@ -54,7 +106,6 @@ func runTestsInDir(dir string) {
 		for scanner.Scan() {
 			fmt.Println(scanner.Text())
 		}
-
 		done <- struct{}{}
 	}()
 
@@ -69,6 +120,34 @@ func runTestsInDir(dir string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func runCover() {
+	cmd := exec.Command("go", "tool", "cover", fmt.Sprintf("--func=%s", profile))
+	cmdReader, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatal(err)
+	}
+	done := make(chan struct{})
+	scanner := bufio.NewScanner(cmdReader)
+	go func() {
+		for scanner.Scan() {
+			fmt.Println(scanner.Text())
+		}
+		done <- struct{}{}
+	}()
+
+	err = cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	<-done
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }
 
 func getPackages() []string {
