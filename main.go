@@ -32,7 +32,7 @@ func generateCoverData() {
 	if err != nil {
 		log.Fatal("error deleting workdir: ", err)
 	}
-	err = os.Mkdir(workdir, os.FileMode(int(0666)))
+	err = os.Mkdir(workdir, os.FileMode(int(0777)))
 	if err != nil {
 		log.Fatal("error creating workdir: ", err)
 	}
@@ -119,12 +119,26 @@ func runTestsInDir(dir string) {
 		done <- struct{}{}
 	}()
 
+	errReader, err := cmd.StderrPipe()
+	if err != nil {
+		log.Fatal("err")
+	}
+	errDone := make(chan struct{})
+	errScanner := bufio.NewScanner(errReader)
+	go func() {
+		for errScanner.Scan() {
+			fmt.Println(errScanner.Text())
+		}
+		errDone <- struct{}{}
+	}()
+
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	<-done
+	<-errDone
 
 	err = cmd.Wait()
 	if err != nil {
