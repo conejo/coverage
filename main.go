@@ -119,12 +119,26 @@ func runTestsInDir(dir string) {
 		done <- struct{}{}
 	}()
 
+	errReader, err := cmd.StderrPipe()
+	if err != nil {
+		log.Fatal("err")
+	}
+	errDone := make(chan struct{})
+	errScanner := bufio.NewScanner(errReader)
+	go func() {
+		for errScanner.Scan() {
+			fmt.Println(errScanner.Text())
+		}
+		errDone <- struct{}{}
+	}()
+
 	err = cmd.Start()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	<-done
+	<-errDone
 
 	err = cmd.Wait()
 	if err != nil {
