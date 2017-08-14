@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -16,15 +17,21 @@ var (
 	workdir = ".cover"
 	profile = workdir + "/cover.out"
 	mode    = "count"
+	runHtml bool
 )
 
 func main() {
+
+	flag.BoolVar(&runHtml, "html", false, "show html coverage report")
+	flag.Parse()
+
 	generateCoverData()
 
-	//todo: go tool cover --func=./.cover/cover.out
-	runCover()
+	runCover("func")
 
-	//todo: handle html flag
+	if runHtml {
+		runCover("html")
+	}
 }
 
 func generateCoverData() {
@@ -146,8 +153,8 @@ func runTestsInDir(dir string) {
 	}
 }
 
-func runCover() {
-	cmd := exec.Command("go", "tool", "cover", fmt.Sprintf("--func=%s", profile))
+func runCover(param string) {
+	cmd := exec.Command("go", "tool", "cover", fmt.Sprintf("--%s=%s", param, profile))
 	cmdReader, err := cmd.StdoutPipe()
 	if err != nil {
 		log.Fatal(err)
