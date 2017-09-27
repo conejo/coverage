@@ -2,10 +2,10 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -115,8 +115,10 @@ func runTestsInDir(dir string) {
 	cmd := exec.Command("go", "test", "-covermode=count", fmt.Sprintf("-coverprofile=%s", f), dir)
 	cmdReader, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		//	log.Fatal(err)
+		log.Print("err:", err)
 	}
+
 	done := make(chan struct{})
 	scanner := bufio.NewScanner(cmdReader)
 	go func() {
@@ -128,7 +130,7 @@ func runTestsInDir(dir string) {
 
 	errReader, err := cmd.StderrPipe()
 	if err != nil {
-		log.Fatal("err")
+		log.Fatal(err)
 	}
 	errDone := make(chan struct{})
 	errScanner := bufio.NewScanner(errReader)
@@ -182,20 +184,50 @@ func runCover(param string) {
 }
 
 func getPackages() []string {
-	out, err := exec.Command("go", "list", "./...").Output()
+	cmd := exec.Command("go", "list", "./...")
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		log.Fatal("stdout:", err)
+	}
+
+	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	err = cmd.Start()
+	if err != nil {
+		log.Fatal("cmd start:", err)
+	}
+
+	slurp, _ := ioutil.ReadAll(stderr)
+
 	lines := []string{}
-	scanner := bufio.NewScanner(bytes.NewReader(out))
+	scanner := bufio.NewScanner(stdout)
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
+		log.Fatal("getPackages scanner:", err)
 	}
+
+	err = cmd.Wait()
+	if err != nil {
+		switch err := err.(type) {
+		case *exec.ExitError:
+
+			log.Fatal("stderr from `go list`:\n", string(slurp))
+		default:
+			log.Fatal("wait:", err)
+		}
+
+	}
+
+	/* 	out, err := exec.Command("go", "list", "./...").Output()
+	   	if err != nil {
+	   		log.Fatal("getPackages cmd:", err)
+	   	} */
 
 	return lines
 }
