@@ -95,7 +95,7 @@ func generateCoverData() {
 
 				_, err = io.Copy(file, strings.NewReader(text+"\n"))
 				if err != nil {
-					log.Fatal("error writing to profile: ", err)
+					log.Print("error writing to profile: ", err)
 				}
 			}
 		}
@@ -130,7 +130,7 @@ func runTestsInDir(dir string) {
 
 	errReader, err := cmd.StderrPipe()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("err: %+v", err)
 	}
 	errDone := make(chan struct{})
 	errScanner := bufio.NewScanner(errReader)
@@ -143,7 +143,7 @@ func runTestsInDir(dir string) {
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("err: %+v", err)
 	}
 
 	<-done
@@ -151,7 +151,7 @@ func runTestsInDir(dir string) {
 
 	err = cmd.Wait()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("err: %+v", err)
 	}
 }
 
@@ -159,7 +159,7 @@ func runCover(param string) {
 	cmd := exec.Command("go", "tool", "cover", fmt.Sprintf("--%s=%s", param, profile))
 	cmdReader, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("err: %+v", err)
 	}
 	done := make(chan struct{})
 	scanner := bufio.NewScanner(cmdReader)
@@ -172,13 +172,13 @@ func runCover(param string) {
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("err: %+v", err)
 	}
 
 	<-done
 	err = cmd.Wait()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("err: %+v", err)
 	}
 
 }
@@ -187,20 +187,23 @@ func getPackages() []string {
 	cmd := exec.Command("go", "list", "./...")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal("stdout:", err)
+		log.Printf("stdout: %+v", err)
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("err: %+v", err)
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal("cmd start:", err)
+		log.Printf("cmd start: %+v", err)
 	}
 
-	slurp, _ := ioutil.ReadAll(stderr)
+	slurp, err := ioutil.ReadAll(stderr)
+	if err != nil {
+		log.Printf("err reading stederr: %+v", err)
+	}
 
 	lines := []string{}
 	scanner := bufio.NewScanner(stdout)
@@ -209,17 +212,16 @@ func getPackages() []string {
 		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		log.Fatal("getPackages scanner:", err)
+		log.Printf("getPackages scanner:", err)
 	}
 
 	err = cmd.Wait()
 	if err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
-
-			log.Fatal("stderr from `go list`:\n", string(slurp))
+			log.Printf("stderr from `go list`:\n", string(slurp))
 		default:
-			log.Fatal("wait:", err)
+			log.Printf("wait:", err)
 		}
 
 	}
