@@ -104,11 +104,11 @@ func generateCoverData() {
 }
 
 func runTestsInDir(dir string) {
-	f := dir
-	if strings.Contains(dir, "/") {
-		el := strings.Split(dir, "/")
-		f = el[len(el)-1]
-	}
+	f := strings.Replace(dir, "/", "-", -1)
+	//	if strings.Contains(dir, "/") {
+	//		el := strings.Split(dir, "/")
+	//		f = el[len(el)-1]
+	//	}
 
 	f = fmt.Sprintf("%s/%s.cover", workdir, f)
 
@@ -116,7 +116,7 @@ func runTestsInDir(dir string) {
 	cmdReader, err := cmd.StdoutPipe()
 	if err != nil {
 		//	log.Fatal(err)
-		log.Print("err:", err)
+		log.Print("err attaching to stdout:", err)
 	}
 
 	done := make(chan struct{})
@@ -130,7 +130,7 @@ func runTestsInDir(dir string) {
 
 	errReader, err := cmd.StderrPipe()
 	if err != nil {
-		log.Printf("err: %+v", err)
+		log.Printf("err attaching to stderr: %+v", err)
 	}
 	errDone := make(chan struct{})
 	errScanner := bufio.NewScanner(errReader)
@@ -143,7 +143,7 @@ func runTestsInDir(dir string) {
 
 	err = cmd.Start()
 	if err != nil {
-		log.Printf("err: %+v", err)
+		log.Printf("err starting cmd: %+v", err)
 	}
 
 	<-done
@@ -151,7 +151,7 @@ func runTestsInDir(dir string) {
 
 	err = cmd.Wait()
 	if err != nil {
-		log.Printf("err: %+v", err)
+		log.Printf("err cmd.wait: %+v", err)
 	}
 }
 
@@ -159,7 +159,7 @@ func runCover(param string) {
 	cmd := exec.Command("go", "tool", "cover", fmt.Sprintf("--%s=%s", param, profile))
 	cmdReader, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Printf("err: %+v", err)
+		log.Printf("err attaching to stdout: %+v", err)
 	}
 	done := make(chan struct{})
 	scanner := bufio.NewScanner(cmdReader)
@@ -170,15 +170,30 @@ func runCover(param string) {
 		done <- struct{}{}
 	}()
 
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		log.Printf("err attaching to stderr: %+v", err)
+	}
+
+	errDone := make(chan struct{})
+	errScanner := bufio.NewScanner(stderr)
+	go func() {
+		for errScanner.Scan() {
+			fmt.Println(errScanner.Text())
+		}
+		errDone <- struct{}{}
+	}()
+
 	err = cmd.Start()
 	if err != nil {
-		log.Printf("err: %+v", err)
+		log.Printf("err starting cmd: %+v", err)
 	}
 
 	<-done
+	<-errDone
 	err = cmd.Wait()
 	if err != nil {
-		log.Printf("err: %+v", err)
+		log.Printf("err after wait(--%s=%s): %v", param, profile, err)
 	}
 
 }
@@ -192,7 +207,7 @@ func getPackages() []string {
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		log.Printf("err: %+v", err)
+		log.Printf("err attaching to stderr: %+v", err)
 	}
 
 	err = cmd.Start()
@@ -202,7 +217,7 @@ func getPackages() []string {
 
 	slurp, err := ioutil.ReadAll(stderr)
 	if err != nil {
-		log.Printf("err reading stederr: %+v", err)
+		log.Printf("err reading stderr: %+v", err)
 	}
 
 	lines := []string{}
@@ -212,16 +227,16 @@ func getPackages() []string {
 		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		log.Printf("getPackages scanner:", err)
+		log.Printf("getPackages scanner: %v", err)
 	}
 
 	err = cmd.Wait()
 	if err != nil {
 		switch err := err.(type) {
 		case *exec.ExitError:
-			log.Printf("stderr from `go list`:\n", string(slurp))
+			log.Printf("stderr from `go list`:\n%s", string(slurp))
 		default:
-			log.Printf("wait:", err)
+			log.Printf("wait: %v", err)
 		}
 
 	}
