@@ -105,17 +105,11 @@ func generateCoverData() {
 
 func runTestsInDir(dir string) {
 	f := strings.Replace(dir, "/", "-", -1)
-	//	if strings.Contains(dir, "/") {
-	//		el := strings.Split(dir, "/")
-	//		f = el[len(el)-1]
-	//	}
-
 	f = fmt.Sprintf("%s/%s.cover", workdir, f)
 
 	cmd := exec.Command("go", "test", "-covermode=count", fmt.Sprintf("-coverprofile=%s", f), dir)
 	cmdReader, err := cmd.StdoutPipe()
 	if err != nil {
-		//	log.Fatal(err)
 		log.Print("err attaching to stdout:", err)
 	}
 
