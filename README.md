@@ -7,6 +7,7 @@ go get github.com/conejo/coverage
 
 ### build and install
 cd ~/go/src/github.com/conejo/coverage
+
 go install .
 
 ## running the app
